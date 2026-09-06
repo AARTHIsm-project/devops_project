@@ -77,13 +77,14 @@ pipeline {
         }
 
         stage('Smoke Test') {
-            steps {
-                sh '''
-                    sleep 5
-                    curl -f http://localhost:${DEPLOY_PORT}/health
-                '''
-            }
-        }
+    steps {
+        sh '''
+            sleep 5
+            curl -f http://host.docker.internal:${DEPLOY_PORT}/health
+        '''
+    }
+}
+        
     }
 
     post {
