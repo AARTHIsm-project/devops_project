@@ -1,0 +1,21 @@
+{
+  "name": "devops-demo-app",
+  "version": "1.0.0",
+  "description": "Sample Node.js app for Jenkins + Docker + GitHub CI/CD pipeline demo",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "jest --coverage --detectOpenHandles",
+    "dev": "node src/index.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^7.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
