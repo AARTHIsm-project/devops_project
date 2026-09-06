@@ -20,6 +20,7 @@ COPY package*.json ./
 RUN npm install --omit=dev && npm cache clean --force
 
 COPY src ./src
+COPY public ./public
 
 # Run as non-root user (built into the node:alpine image)
 USER node
