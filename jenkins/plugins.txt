@@ -1,0 +1,13 @@
+# Install with: docker exec jenkins jenkins-plugin-cli --plugin-file /var/jenkins_home/plugins.txt
+# or install manually via Manage Jenkins > Plugins after first boot.
+
+git
+github
+github-branch-source
+workflow-aggregator
+docker-workflow
+docker-plugin
+credentials-binding
+pipeline-stage-view
+timestamper
+ws-cleanup

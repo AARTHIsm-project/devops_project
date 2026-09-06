@@ -1,0 +1,19 @@
+# Node
+node_modules/
+npm-debug.log
+coverage/
+
+# Env
+.env
+.env.local
+
+# Jenkins
+jenkins/jenkins_home/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
