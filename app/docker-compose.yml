@@ -5,8 +5,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: devops-demo-app:local
-    container_name: devops-demo-app
+    image: student-management-system:local
+    container_name: student-management-system
     ports:
       - "3000:3000"
     environment:

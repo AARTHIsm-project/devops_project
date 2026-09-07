@@ -1,7 +1,7 @@
 {
-  "name": "devops-demo-app",
+  "name": "student-management-system",
   "version": "1.0.0",
-  "description": "Sample Node.js app for Jenkins + Docker + GitHub CI/CD pipeline demo",
+  "description": "Student Management System with login, dashboard, and full CRUD - Jenkins + Docker + GitHub CI/CD demo",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",

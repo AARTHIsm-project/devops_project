@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Login — DevOps Demo App</title>
+<title>Login — Student Management System</title>
 <style>
   * { box-sizing: border-box; }
   body {
     margin: 0;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #1e3a8a 0%, #3b0764 100%);
     min-height: 100vh;
     display: flex;
     align-items: center;
@@ -18,30 +18,28 @@
   }
   .card {
     width: 100%;
-    max-width: 360px;
+    max-width: 380px;
     background: #ffffff;
     border-radius: 16px;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.25);
-    padding: 32px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    padding: 36px;
   }
-  h1 {
-    margin: 0 0 4px;
-    font-size: 22px;
-    text-align: center;
+  .logo {
+    width: 52px;
+    height: 52px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #1e3a8a, #3b0764);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 24px;
+    font-weight: 700;
+    margin: 0 auto 16px;
   }
-  .subtitle {
-    color: #6b7280;
-    margin: 0 0 24px;
-    font-size: 13px;
-    text-align: center;
-  }
-  label {
-    display: block;
-    font-size: 13px;
-    font-weight: 600;
-    margin-bottom: 6px;
-    color: #374151;
-  }
+  h1 { margin: 0 0 4px; font-size: 22px; text-align: center; }
+  .subtitle { color: #6b7280; margin: 0 0 28px; font-size: 13px; text-align: center; }
+  label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: #374151; }
   input {
     width: 100%;
     padding: 10px 14px;
@@ -50,13 +48,10 @@
     font-size: 14px;
     margin-bottom: 16px;
   }
-  input:focus {
-    outline: none;
-    border-color: #667eea;
-  }
+  input:focus { outline: none; border-color: #3b0764; }
   button {
     width: 100%;
-    background: #667eea;
+    background: #1e3a8a;
     color: white;
     border: none;
     padding: 12px;
@@ -64,30 +59,18 @@
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
-    transition: background 0.15s;
   }
-  button:hover { background: #5568d3; }
-  button:disabled { background: #a5b4fc; cursor: not-allowed; }
-  #errorMsg {
-    color: #dc2626;
-    font-size: 13px;
-    margin-bottom: 12px;
-    display: none;
-    text-align: center;
-  }
-  .hint {
-    margin-top: 18px;
-    font-size: 12px;
-    color: #9ca3af;
-    text-align: center;
-    line-height: 1.5;
-  }
+  button:hover { background: #172d6b; }
+  button:disabled { background: #93a4d6; cursor: not-allowed; }
+  #errorMsg { color: #dc2626; font-size: 13px; margin-bottom: 12px; display: none; text-align: center; }
+  .hint { margin-top: 18px; font-size: 12px; color: #9ca3af; text-align: center; line-height: 1.5; }
 </style>
 </head>
 <body>
   <div class="card">
-    <h1>Welcome back</h1>
-    <p class="subtitle">Sign in to the DevOps demo dashboard</p>
+    <div class="logo">SM</div>
+    <h1>Student Management System</h1>
+    <p class="subtitle">Sign in to manage student records</p>
 
     <div id="errorMsg"></div>
 
@@ -102,7 +85,7 @@
     </form>
 
     <p class="hint">Demo credentials — username: <b>admin</b>, password: <b>admin123</b><br/>
-    (In-memory only — resets when the server restarts.)</p>
+    (In-memory only — data resets when the server restarts.)</p>
   </div>
 
 <script>
@@ -132,7 +115,6 @@
         errorMsg.style.display = 'block';
         return;
       }
-
       window.location.href = '/dashboard';
     } catch (err) {
       errorMsg.textContent = 'Could not reach the server. Please try again.';

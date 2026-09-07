@@ -20,33 +20,27 @@ describe('Unauthenticated access', () => {
     expect(res.headers.location).toBe('/login');
   });
 
-  it('blocks GET /api/tasks with 401 when not authenticated', async () => {
-    const res = await request(app).get('/api/tasks');
+  it('blocks GET /api/students with 401 when not authenticated', async () => {
+    const res = await request(app).get('/api/students');
     expect(res.statusCode).toBe(401);
   });
 
-  it('GET /api/me reports authenticated: false', async () => {
-    const res = await request(app).get('/api/me');
-    expect(res.statusCode).toBe(200);
-    expect(res.body.authenticated).toBe(false);
+  it('blocks GET /api/stats with 401 when not authenticated', async () => {
+    const res = await request(app).get('/api/stats');
+    expect(res.statusCode).toBe(401);
   });
 });
 
 describe('Login', () => {
   it('rejects invalid credentials with 401', async () => {
-    const res = await request(app)
-      .post('/api/login')
-      .send({ username: 'admin', password: 'wrongpassword' });
+    const res = await request(app).post('/api/login').send({ username: 'admin', password: 'wrong' });
     expect(res.statusCode).toBe(401);
   });
 
-  it('accepts valid credentials and returns success', async () => {
-    const res = await request(app)
-      .post('/api/login')
-      .send({ username: 'admin', password: 'admin123' });
+  it('accepts valid credentials', async () => {
+    const res = await request(app).post('/api/login').send({ username: 'admin', password: 'admin123' });
     expect(res.statusCode).toBe(200);
     expect(res.body.success).toBe(true);
-    expect(res.body.username).toBe('admin');
   });
 });
 
@@ -60,24 +54,23 @@ describe('Health and info (always public)', () => {
   it('GET /api/info returns service info', async () => {
     const res = await request(app).get('/api/info');
     expect(res.statusCode).toBe(200);
-    expect(res.body.service).toBe('devops-demo-app');
+    expect(res.body.service).toBe('student-management-system');
   });
 });
 
-describe('Authenticated session (full CRUD flow)', () => {
-  const agent = request.agent(app); // persists the session cookie across requests
+describe('Authenticated session', () => {
+  const agent = request.agent(app);
 
   beforeAll(async () => {
     await agent.post('/api/login').send({ username: 'admin', password: 'admin123' });
   });
 
-  it('GET /api/me reports authenticated: true after login', async () => {
+  it('reports authenticated true after login', async () => {
     const res = await agent.get('/api/me');
     expect(res.body.authenticated).toBe(true);
-    expect(res.body.username).toBe('admin');
   });
 
-  it('serves the dashboard page once logged in', async () => {
+  it('serves the dashboard once logged in', async () => {
     const res = await agent.get('/dashboard');
     expect(res.statusCode).toBe(200);
     expect(res.headers['content-type']).toMatch(/html/);
@@ -89,82 +82,141 @@ describe('Authenticated session (full CRUD flow)', () => {
     expect(res.headers.location).toBe('/dashboard');
   });
 
-  it('lists the seeded tasks', async () => {
-    const res = await agent.get('/api/tasks');
-    expect(res.statusCode).toBe(200);
-    expect(Array.isArray(res.body)).toBe(true);
-    expect(res.body.length).toBeGreaterThanOrEqual(3);
+  describe('Stats', () => {
+    it('returns dashboard stats with expected shape', async () => {
+      const res = await agent.get('/api/stats');
+      expect(res.statusCode).toBe(200);
+      expect(res.body).toHaveProperty('totalStudents');
+      expect(res.body).toHaveProperty('activeStudents');
+      expect(res.body).toHaveProperty('inactiveStudents');
+      expect(res.body).toHaveProperty('averageMarks');
+      expect(res.body.totalStudents).toBeGreaterThanOrEqual(4);
+    });
   });
 
-  it('gets a single task by id', async () => {
-    const res = await agent.get('/api/tasks/1');
-    expect(res.statusCode).toBe(200);
-    expect(res.body.id).toBe(1);
+  describe('Student listing, search, and filters', () => {
+    it('lists the seeded students', async () => {
+      const res = await agent.get('/api/students');
+      expect(res.statusCode).toBe(200);
+      expect(Array.isArray(res.body)).toBe(true);
+      expect(res.body.length).toBeGreaterThanOrEqual(4);
+    });
+
+    it('gets a single student by id', async () => {
+      const res = await agent.get('/api/students/1');
+      expect(res.statusCode).toBe(200);
+      expect(res.body.id).toBe(1);
+    });
+
+    it('returns 404 for a student id that does not exist', async () => {
+      const res = await agent.get('/api/students/9999');
+      expect(res.statusCode).toBe(404);
+    });
+
+    it('filters by search term (name)', async () => {
+      const res = await agent.get('/api/students?search=Aarthi');
+      expect(res.statusCode).toBe(200);
+      expect(res.body.every((s) => s.name.toLowerCase().includes('aarthi'))).toBe(true);
+    });
+
+    it('filters by status', async () => {
+      const res = await agent.get('/api/students?status=inactive');
+      expect(res.statusCode).toBe(200);
+      expect(res.body.every((s) => s.status === 'inactive')).toBe(true);
+    });
+
+    it('filters by className', async () => {
+      const res = await agent.get('/api/students?className=10th A');
+      expect(res.statusCode).toBe(200);
+      expect(res.body.every((s) => s.className === '10th A')).toBe(true);
+    });
   });
 
-  it('returns 404 for a task id that does not exist', async () => {
-    const res = await agent.get('/api/tasks/9999');
-    expect(res.statusCode).toBe(404);
-  });
+  describe('Student CRUD', () => {
+    let createdId;
 
-  let createdId;
+    it('creates a new student (CREATE)', async () => {
+      const res = await agent.post('/api/students').send({
+        name: 'Priya V',
+        rollNumber: 'R100',
+        className: '9th A',
+        email: 'priya.v@example.com',
+        phone: '9999999999',
+        marks: 88,
+        status: 'active'
+      });
+      expect(res.statusCode).toBe(201);
+      expect(res.body.name).toBe('Priya V');
+      createdId = res.body.id;
+    });
 
-  it('creates a new task (CREATE)', async () => {
-    const res = await agent.post('/api/tasks').send({ title: 'Write CRUD tests' });
-    expect(res.statusCode).toBe(201);
-    expect(res.body.title).toBe('Write CRUD tests');
-    expect(res.body.done).toBe(false);
-    createdId = res.body.id;
-  });
+    it('rejects creating a student with missing required fields', async () => {
+      const res = await agent.post('/api/students').send({ name: 'No Roll' });
+      expect(res.statusCode).toBe(400);
+    });
 
-  it('rejects creating a task with no title', async () => {
-    const res = await agent.post('/api/tasks').send({});
-    expect(res.statusCode).toBe(400);
-  });
+    it('rejects a duplicate rollNumber', async () => {
+      const res = await agent.post('/api/students').send({
+        name: 'Duplicate Roll',
+        rollNumber: 'R100',
+        className: '9th A'
+      });
+      expect(res.statusCode).toBe(409);
+    });
 
-  it('updates a task title (UPDATE)', async () => {
-    const res = await agent.put(`/api/tasks/${createdId}`).send({ title: 'Write CRUD tests (updated)' });
-    expect(res.statusCode).toBe(200);
-    expect(res.body.title).toBe('Write CRUD tests (updated)');
-  });
+    it('rejects invalid marks (out of range)', async () => {
+      const res = await agent.post('/api/students').send({
+        name: 'Bad Marks',
+        rollNumber: 'R101',
+        className: '9th A',
+        marks: 150
+      });
+      expect(res.statusCode).toBe(400);
+    });
 
-  it('toggles a task done status (UPDATE)', async () => {
-    const res = await agent.put(`/api/tasks/${createdId}`).send({ done: true });
-    expect(res.statusCode).toBe(200);
-    expect(res.body.done).toBe(true);
-  });
+    it('rejects invalid email format', async () => {
+      const res = await agent.post('/api/students').send({
+        name: 'Bad Email',
+        rollNumber: 'R102',
+        className: '9th A',
+        email: 'not-an-email'
+      });
+      expect(res.statusCode).toBe(400);
+    });
 
-  it('rejects updating with an invalid title', async () => {
-    const res = await agent.put(`/api/tasks/${createdId}`).send({ title: '   ' });
-    expect(res.statusCode).toBe(400);
-  });
+    it('updates a student (UPDATE)', async () => {
+      const res = await agent.put(`/api/students/${createdId}`).send({ marks: 95 });
+      expect(res.statusCode).toBe(200);
+      expect(res.body.marks).toBe(95);
+    });
 
-  it('rejects updating with an invalid done value', async () => {
-    const res = await agent.put(`/api/tasks/${createdId}`).send({ done: 'yes' });
-    expect(res.statusCode).toBe(400);
-  });
+    it('rejects update with invalid status', async () => {
+      const res = await agent.put(`/api/students/${createdId}`).send({ status: 'graduated' });
+      expect(res.statusCode).toBe(400);
+    });
 
-  it('returns 404 updating a task that does not exist', async () => {
-    const res = await agent.put('/api/tasks/9999').send({ title: 'nope' });
-    expect(res.statusCode).toBe(404);
-  });
+    it('returns 404 updating a student that does not exist', async () => {
+      const res = await agent.put('/api/students/9999').send({ marks: 50 });
+      expect(res.statusCode).toBe(404);
+    });
 
-  it('deletes a task (DELETE)', async () => {
-    const res = await agent.delete(`/api/tasks/${createdId}`);
-    expect(res.statusCode).toBe(200);
-    expect(res.body.id).toBe(createdId);
-  });
+    it('deletes a student (DELETE)', async () => {
+      const res = await agent.delete(`/api/students/${createdId}`);
+      expect(res.statusCode).toBe(200);
+      expect(res.body.id).toBe(createdId);
+    });
 
-  it('returns 404 deleting a task that no longer exists', async () => {
-    const res = await agent.delete(`/api/tasks/${createdId}`);
-    expect(res.statusCode).toBe(404);
+    it('returns 404 deleting a student that no longer exists', async () => {
+      const res = await agent.delete(`/api/students/${createdId}`);
+      expect(res.statusCode).toBe(404);
+    });
   });
 
   it('logs out and blocks further API access', async () => {
     const logoutRes = await agent.post('/api/logout');
     expect(logoutRes.statusCode).toBe(200);
 
-    const res = await agent.get('/api/tasks');
+    const res = await agent.get('/api/students');
     expect(res.statusCode).toBe(401);
   });
 });

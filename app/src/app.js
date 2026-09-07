@@ -6,7 +6,7 @@ const app = express();
 app.use(express.json());
 
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'devops-demo-secret-change-me',
+  secret: process.env.SESSION_SECRET || 'student-mgmt-secret-change-me',
   resave: false,
   saveUninitialized: false,
   cookie: { maxAge: 1000 * 60 * 60 } // 1 hour
@@ -16,12 +16,13 @@ app.use(session({
 app.use(express.static(path.join(__dirname, '..', 'public'), { index: false }));
 
 // ---- In-memory "database" (resets whenever the server restarts) ----
-let tasks = [
-  { id: 1, title: 'Set up Jenkins', done: true },
-  { id: 2, title: 'Write Dockerfile', done: true },
-  { id: 3, title: 'Wire up CI/CD pipeline', done: false }
+let students = [
+  { id: 1, name: 'Aarthi S', rollNumber: 'R001', className: '10th A', email: 'aarthi.s@example.com', phone: '9876543210', marks: 92, status: 'active' },
+  { id: 2, name: 'Karthik R', rollNumber: 'R002', className: '10th A', email: 'karthik.r@example.com', phone: '9876543211', marks: 78, status: 'active' },
+  { id: 3, name: 'Divya M', rollNumber: 'R003', className: '10th B', email: 'divya.m@example.com', phone: '9876543212', marks: 85, status: 'active' },
+  { id: 4, name: 'Suresh K', rollNumber: 'R004', className: '10th B', email: 'suresh.k@example.com', phone: '9876543213', marks: 64, status: 'inactive' }
 ];
-let nextTaskId = 4;
+let nextStudentId = 5;
 
 // In-memory user store (demo only — plaintext password, not for production use)
 const users = [
@@ -36,6 +37,32 @@ function requireApiAuth(req, res, next) {
 function requirePageAuth(req, res, next) {
   if (req.session && req.session.user) return next();
   return res.redirect('/login');
+}
+
+function validateStudentInput(body, { partial = false } = {}) {
+  const errors = [];
+  const { name, rollNumber, className, email, phone, marks, status } = body || {};
+
+  if (!partial || name !== undefined) {
+    if (!name || typeof name !== 'string' || !name.trim()) errors.push('name is required');
+  }
+  if (!partial || rollNumber !== undefined) {
+    if (!rollNumber || typeof rollNumber !== 'string' || !rollNumber.trim()) errors.push('rollNumber is required');
+  }
+  if (!partial || className !== undefined) {
+    if (!className || typeof className !== 'string' || !className.trim()) errors.push('className is required');
+  }
+  if (email !== undefined && email !== '' && !/^\S+@\S+\.\S+$/.test(email)) {
+    errors.push('email must be a valid email address');
+  }
+  if (marks !== undefined && marks !== '' && marks !== null) {
+    const n = Number(marks);
+    if (Number.isNaN(n) || n < 0 || n > 100) errors.push('marks must be a number between 0 and 100');
+  }
+  if (status !== undefined && !['active', 'inactive'].includes(status)) {
+    errors.push('status must be "active" or "inactive"');
+  }
+  return errors;
 }
 
 // ---- Pages ----
@@ -78,65 +105,116 @@ app.get('/api/me', (req, res) => {
 // ---- Misc ----
 app.get('/api/info', (req, res) => {
   res.json({
-    service: 'devops-demo-app',
-    message: 'Jenkins + Docker + GitHub CI/CD demo is running',
+    service: 'student-management-system',
+    message: 'Student Management System — Jenkins + Docker + GitHub CI/CD demo',
     version: process.env.APP_VERSION || 'dev'
   });
 });
 
-// Used by Docker HEALTHCHECK and load balancers / k8s probes — intentionally not auth-protected
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'UP' });
 });
 
-// ---- Task CRUD API (all protected — must be logged in) ----
-app.get('/api/tasks', requireApiAuth, (req, res) => {
-  res.status(200).json(tasks);
+// ---- Dashboard stats (protected) ----
+app.get('/api/stats', requireApiAuth, (req, res) => {
+  const total = students.length;
+  const active = students.filter((s) => s.status === 'active').length;
+  const inactive = total - active;
+  const avgMarks = total
+    ? Math.round((students.reduce((sum, s) => sum + (Number(s.marks) || 0), 0) / total) * 10) / 10
+    : 0;
+  const classCounts = students.reduce((acc, s) => {
+    acc[s.className] = (acc[s.className] || 0) + 1;
+    return acc;
+  }, {});
+
+  res.status(200).json({
+    totalStudents: total,
+    activeStudents: active,
+    inactiveStudents: inactive,
+    averageMarks: avgMarks,
+    classCounts
+  });
 });
 
-app.get('/api/tasks/:id', requireApiAuth, (req, res) => {
-  const task = tasks.find((t) => t.id === parseInt(req.params.id, 10));
-  if (!task) return res.status(404).json({ error: 'Task not found' });
-  res.status(200).json(task);
-});
+// ---- Student CRUD API (all protected — must be logged in) ----
+app.get('/api/students', requireApiAuth, (req, res) => {
+  const { search, className, status } = req.query;
+  let result = students;
 
-app.post('/api/tasks', requireApiAuth, (req, res) => {
-  const { title } = req.body || {};
-  if (!title || typeof title !== 'string') {
-    return res.status(400).json({ error: 'title is required and must be a string' });
+  if (search) {
+    const q = String(search).toLowerCase();
+    result = result.filter(
+      (s) => s.name.toLowerCase().includes(q) || s.rollNumber.toLowerCase().includes(q)
+    );
   }
-  const newTask = { id: nextTaskId++, title, done: false };
-  tasks.push(newTask);
-  res.status(201).json(newTask);
-});
-
-app.put('/api/tasks/:id', requireApiAuth, (req, res) => {
-  const task = tasks.find((t) => t.id === parseInt(req.params.id, 10));
-  if (!task) return res.status(404).json({ error: 'Task not found' });
-
-  const { title, done } = req.body || {};
-
-  if (title !== undefined) {
-    if (typeof title !== 'string' || !title.trim()) {
-      return res.status(400).json({ error: 'title must be a non-empty string' });
-    }
-    task.title = title;
+  if (className) {
+    result = result.filter((s) => s.className === className);
+  }
+  if (status) {
+    result = result.filter((s) => s.status === status);
   }
 
-  if (done !== undefined) {
-    if (typeof done !== 'boolean') {
-      return res.status(400).json({ error: 'done must be a boolean' });
-    }
-    task.done = done;
-  }
-
-  res.status(200).json(task);
+  res.status(200).json(result);
 });
 
-app.delete('/api/tasks/:id', requireApiAuth, (req, res) => {
-  const index = tasks.findIndex((t) => t.id === parseInt(req.params.id, 10));
-  if (index === -1) return res.status(404).json({ error: 'Task not found' });
-  const [deleted] = tasks.splice(index, 1);
+app.get('/api/students/:id', requireApiAuth, (req, res) => {
+  const student = students.find((s) => s.id === parseInt(req.params.id, 10));
+  if (!student) return res.status(404).json({ error: 'Student not found' });
+  res.status(200).json(student);
+});
+
+app.post('/api/students', requireApiAuth, (req, res) => {
+  const errors = validateStudentInput(req.body);
+  if (errors.length) return res.status(400).json({ error: errors.join(', ') });
+
+  const { name, rollNumber, className, email, phone, marks, status } = req.body;
+
+  const duplicateRoll = students.some((s) => s.rollNumber === rollNumber);
+  if (duplicateRoll) return res.status(409).json({ error: 'rollNumber already exists' });
+
+  const newStudent = {
+    id: nextStudentId++,
+    name: name.trim(),
+    rollNumber: rollNumber.trim(),
+    className: className.trim(),
+    email: email ? email.trim() : '',
+    phone: phone ? phone.trim() : '',
+    marks: marks !== undefined && marks !== '' ? Number(marks) : 0,
+    status: status || 'active'
+  };
+  students.push(newStudent);
+  res.status(201).json(newStudent);
+});
+
+app.put('/api/students/:id', requireApiAuth, (req, res) => {
+  const student = students.find((s) => s.id === parseInt(req.params.id, 10));
+  if (!student) return res.status(404).json({ error: 'Student not found' });
+
+  const errors = validateStudentInput(req.body, { partial: true });
+  if (errors.length) return res.status(400).json({ error: errors.join(', ') });
+
+  const { name, rollNumber, className, email, phone, marks, status } = req.body;
+
+  if (rollNumber !== undefined) {
+    const duplicateRoll = students.some((s) => s.rollNumber === rollNumber && s.id !== student.id);
+    if (duplicateRoll) return res.status(409).json({ error: 'rollNumber already exists' });
+    student.rollNumber = rollNumber.trim();
+  }
+  if (name !== undefined) student.name = name.trim();
+  if (className !== undefined) student.className = className.trim();
+  if (email !== undefined) student.email = email.trim();
+  if (phone !== undefined) student.phone = phone.trim();
+  if (marks !== undefined) student.marks = Number(marks);
+  if (status !== undefined) student.status = status;
+
+  res.status(200).json(student);
+});
+
+app.delete('/api/students/:id', requireApiAuth, (req, res) => {
+  const index = students.findIndex((s) => s.id === parseInt(req.params.id, 10));
+  if (index === -1) return res.status(404).json({ error: 'Student not found' });
+  const [deleted] = students.splice(index, 1);
   res.status(200).json(deleted);
 });
 

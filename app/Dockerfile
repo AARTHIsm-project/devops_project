@@ -15,14 +15,12 @@ FROM node:18-alpine AS production
 ENV NODE_ENV=production
 WORKDIR /usr/src/app
 
-# Install only production deps for a lean final image
 COPY package*.json ./
 RUN npm install --omit=dev && npm cache clean --force
 
 COPY src ./src
 COPY public ./public
 
-# Run as non-root user (built into the node:alpine image)
 USER node
 
 EXPOSE 3000
